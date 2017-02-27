@@ -23,46 +23,80 @@
 
 // Conversion Unsigned short to float
 float** convert_to_float(pnm RGB){
-  int rows = pnm_get_height(RGB);
-  int cols = pnm_get_width(RGB);
+	printf("CONVERTING TO FLOAT \n");
+	int rows = pnm_get_height(RGB);
+	int cols = pnm_get_width(RGB);
 
-  float** matrix = malloc(3*sizeof(float*));
-  matrix[0] = malloc(sizeof(float)*rows*cols);
-  matrix[1] = malloc(sizeof(float)*rows*cols);
-  matrix[2] = malloc(sizeof(float)*rows*cols);
-  unsigned short *buffer = pnm_get_image(RGB);
+	unsigned short *oldStart = pnm_get_image(RGB);
+	unsigned short *oldCurrent = pnm_get_image(RGB);
 
-  for(int k=0; k<3;k++){
-    unsigned short* chanel = malloc(sizeof(unsigned short)*rows*cols);
-    chanel = pnm_get_channel(RGB, buffer, k);
-      
-    for(int i=0; i<rows*cols;i++){
-      matrix[k][i] = (float)chanel[i];
-    }
-    free(chanel);
-  }
-  free(buffer);
+	float** ret = malloc(3*sizeof(float*));
+	ret[0] = malloc(sizeof(float)*rows*cols);
+	ret[1] = malloc(sizeof(float)*rows*cols);
+	ret[2] = malloc(sizeof(float)*rows*cols);
+
+	unsigned short* R = malloc(sizeof(unsigned short)*cols*rows);
+	for(int i=0;i<rows; i++){
+		for(int j=0;j<cols;j++){
+			oldCurrent = oldStart + pnm_offset(RGB, i,j);
+			R[(i*cols)+j] = *oldCurrent;
+			
+		}
+	}
+
+	unsigned short* G = malloc(sizeof(unsigned short)*cols*rows);
+	for(int i=0;i<rows; i++){
+		for(int j=0;j<cols;j++){
+			oldCurrent = oldStart + pnm_offset(RGB, i,j);
+			oldCurrent++;
+			G[(i*cols)+j] = *oldCurrent;
+			
+		}
+	}
+
+	unsigned short* B = malloc(sizeof(unsigned short)*cols*rows);
+	for(int i=0;i<rows; i++){
+		for(int j=0;j<cols;j++){
+			oldCurrent = oldStart + pnm_offset(RGB, i,j);
+			oldCurrent+=2;
+			B[(i*cols)+j] = *oldCurrent;
+			
+		}
+	}
+
+
+	for(int i=0;i<rows; i++){
+		for(int j=0;j<cols;j++){
+			ret[0][(i*cols)+j] = (float)R[(i*cols)+j];
+			ret[1][(i*cols)+j] = (float)G[(i*cols)+j];
+			ret[2][(i*cols)+j] = (float)B[(i*cols)+j];
+		}
+	}
     
-  return matrix;
+  return ret;
 }
 
 
 pnm convert_to_unsigned_short(float** matrix,int rows, int cols){
-  pnm imd = pnm_new(cols, rows, PnmRawPpm);
+		printf("CONVERTING TO UNSIGNED \n");
+  pnm img = pnm_new(cols, rows, PnmRawPpm);
 
-  unsigned short *current = pnm_get_image(imd);
+  unsigned short *current = pnm_get_image(img);
+  unsigned short *start = pnm_get_image(img);
 
-  for(int i=0; i<rows; i++){
-    for(int j=0; j<cols; j++){
-      *current = (unsigned short)matrix[0][i*cols +j];
-      current++;
-      *current = (unsigned short)matrix[1][i*cols +j];
-      current++;
-      *current = (unsigned short)matrix[2][i*cols +j];
-      current++;
-    }
-  }
-  return imd;
+	for(int i=0;i<rows; i++){
+		for(int j=0;j<cols;j++){
+			current = start + pnm_offset(img, i,j);
+			
+			*current = (unsigned short)matrix[0][(i*cols)+j];
+			current++;
+			*current = (unsigned short)matrix[1][(i*cols)+j];
+			current++;
+			*current = (unsigned short)matrix[2][(i*cols)+j];
+			current++;
+		}
+	}
+  return img;
 }
 
 
