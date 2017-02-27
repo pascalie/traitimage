@@ -23,7 +23,6 @@
 
 // Conversion Unsigned short to float
 float** convert_to_float(pnm RGB){
-	printf("CONVERTING TO FLOAT \n");
 	int rows = pnm_get_height(RGB);
 	int cols = pnm_get_width(RGB);
 
@@ -73,16 +72,15 @@ float** convert_to_float(pnm RGB){
 		}
 	}
     
-  return ret;
+	return ret;
 }
 
 
 pnm convert_to_unsigned_short(float** matrix,int rows, int cols){
-		printf("CONVERTING TO UNSIGNED \n");
-  pnm img = pnm_new(cols, rows, PnmRawPpm);
+	pnm img = pnm_new(cols, rows, PnmRawPpm);
 
-  unsigned short *current = pnm_get_image(img);
-  unsigned short *start = pnm_get_image(img);
+	unsigned short *current = pnm_get_image(img);
+	unsigned short *start = pnm_get_image(img);
 
 	for(int i=0;i<rows; i++){
 		for(int j=0;j<cols;j++){
@@ -96,7 +94,7 @@ pnm convert_to_unsigned_short(float** matrix,int rows, int cols){
 			current++;
 		}
 	}
-  return img;
+	return img;
 }
 
 
