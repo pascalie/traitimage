@@ -5,16 +5,9 @@
  *        Erik Reinhard, Michael Ashikhmin, Bruce Gooch and Peter Shirley, 
  *        'Color Transfer between Images', IEEE CGA special issue on 
  *        Applied Perception, Vol 21, No 5, pp 34-41, September - October 2001
+ * @authors HENRY Pascalie & GRUCHET Sébastien
  */
 
-//RGB=>LMS and BACK :
-//blancs parfois jaune
-
-//passage au log and back :
-//toujours les meme jaune
-
-//LMS=>LAB and BACK :
-//meme jaune
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
@@ -27,6 +20,7 @@ float sqrt3 = 1.73205080757;
 float sqrt6 = 2.44948974278;
 
 #define D 3
+
 static float RGB2LMS[D][D] = {
 	{0.3811, 0.5783, 0.0402}, 
 	{0.1967, 0.7244, 0.0782},	
@@ -38,8 +32,6 @@ static float LMS2RGB[D][D] = {
 	{-1.2186, 2.3809, -0.1624},	
 	{0.0497, -.2439, 1.2045}
 	};
-
-
 
 static float LMS2LAB[D][D] = {
 	{0.57735026919, 0.57735026919, 0.57735026919},
@@ -63,16 +55,14 @@ float** convert_to_float(pnm RGB){
 	unsigned short *oldCurrent = pnm_get_image(RGB);
 
 	float** ret = malloc(3*sizeof(float*));
-	ret[0] = malloc(sizeof(float)*rows*cols);
-	ret[1] = malloc(sizeof(float)*rows*cols);
-	ret[2] = malloc(sizeof(float)*rows*cols);
-
+	for(int k = 0; k<3; k++)
+		ret[k] = malloc(sizeof(float)*rows*cols);
+	
 	unsigned short* R = malloc(sizeof(unsigned short)*cols*rows);
 	for(int i=0;i<rows; i++){
 		for(int j=0;j<cols;j++){
 			oldCurrent = oldStart + pnm_offset(RGB, i,j);
 			R[(i*cols)+j] = *oldCurrent;
-			
 		}
 	}
 
@@ -82,7 +72,6 @@ float** convert_to_float(pnm RGB){
 			oldCurrent = oldStart + pnm_offset(RGB, i,j);
 			oldCurrent++;
 			G[(i*cols)+j] = *oldCurrent;
-			
 		}
 	}
 
@@ -92,10 +81,8 @@ float** convert_to_float(pnm RGB){
 			oldCurrent = oldStart + pnm_offset(RGB, i,j);
 			oldCurrent+=2;
 			B[(i*cols)+j] = *oldCurrent;
-			
 		}
 	}
-
 
 	for(int i=0;i<rows; i++){
 		for(int j=0;j<cols;j++){
@@ -104,11 +91,10 @@ float** convert_to_float(pnm RGB){
 			ret[2][(i*cols)+j] = (float)B[(i*cols)+j];
 		}
 	}
-    
-	return ret;
+    	return ret;
 }
 
-
+// Conversion float to unsigned short
 pnm convert_to_unsigned_short(float** matrix,int rows, int cols){
 	pnm img = pnm_new(cols, rows, PnmRawPpm);
 
@@ -118,18 +104,17 @@ pnm convert_to_unsigned_short(float** matrix,int rows, int cols){
 	for(int i=0;i<rows; i++){
 		for(int j=0;j<cols;j++){
 			current = start + pnm_offset(img, i,j);
-			
-			*current = (unsigned short)matrix[0][(i*cols)+j];
-			current++;
-			*current = (unsigned short)matrix[1][(i*cols)+j];
-			current++;
-			*current = (unsigned short)matrix[2][(i*cols)+j];
-			current++;
+			for(int k=0; k<3; k++){
+				*current = (unsigned short)matrix[k][(i*cols)+j];
+				current++;
+			}
 		}
 	}
 	return img;
 }
 
+
+// Produit de deux matrices de taille 3*3
 float** produitMat(float** image, float matrice[][3], int size){
 	float **ret = malloc(sizeof(float*)*3);
 	for(int k=0; k<3;k++){
@@ -148,20 +133,22 @@ float** produitMat(float** image, float matrice[][3], int size){
 	return ret;
 }
 
+
+// Passage au logarithme en base 10
 void logMatrice(float** image, int size){
 	for(int k=0; k<3; k++){
 		for (int i = 0; i < size; i++){
-			if(image[k][i] > 0){
+			if(image[k][i] > 0)
 				image[k][i] = log10f(image[k][i]);	
-			} else {
+			else {
 				image[k][i] = 0.0001;
 				image[k][i] = log10f(image[k][i]);
 			}
-			
 		}
 	}
 }
 
+// Fonction inverse 
 void puissance10(float** image, int size){
 	for(int k=0; k<3; k++){
 		for (int i = 0; i < size; i++){
@@ -170,48 +157,46 @@ void puissance10(float** image, int size){
 	}
 }
 
+
+// Calcul de la moyenne
 float moyenne(float* tab, int size){
 	float somme = 0;
 	for (int i = 0; i < size; i++){
 		somme += tab[i];				
 	}
-
 	return somme/size;
 }
 
+
+// Calcul de l'ecart-type
 float ecartType(float* tab, int size){
 	float somme = 0;
-	for (int i = 0; i < size; i++){
+	for (int i = 0; i < size; i++)
 		somme += (tab[i]*tab[i]);				
-	}
-	
 	float mean = moyenne(tab, size);
 	float mean2 = mean*mean;
-
-	printf("%f     %f\n", somme/size, mean2);
-
-
 	float ecartType = sqrtf( (somme/size) - mean2 );
-
 	return ecartType;
 } 
 
+
+// Soustraction de la moyenne de l'image source
 float** matriceMinusMean(float** image, int size){
 	float **ret = malloc(sizeof(float*)*3);
 	for(int k=0; k<3;k++){
 		ret[k]=malloc(sizeof(float)*size);
 	}
-
 	for(int k=0; k<3; k++){
 		float mean = moyenne(image[k], size);
 		for (int i = 0; i < size; i++){
 			ret[k][i] = image[k][i] - mean;	
 		}
 	}
-
 	return ret;
 }
 
+
+// Ajout de la moyenne de l'image cible
 float** matricePlusMean(float** image, float** target, int sizeImage, int sizeTarget){
 	float **ret = malloc(sizeof(float*)*3);
 	for(int k=0; k<3;k++){
@@ -228,21 +213,18 @@ float** matricePlusMean(float** image, float** target, int sizeImage, int sizeTa
 	return ret;
 }
 
+// Application de la transformation pondérée par l'écart-type
 float** matriceTransfET(float** source, float** target, float** modified,int size){
 	float **ret = malloc(sizeof(float*)*3);
 	for(int k=0; k<3;k++){
 		ret[k]=malloc(sizeof(float)*size);
 	}
-
 	for(int k=0; k<3; k++){
 		float ECtarget = ecartType(target[k], size);
 		float ECsource = ecartType(source[k], size);
-		//printf("%f      %f\n", ECtarget, ECsource);
-		for (int i = 0; i < size; i++){
+		for (int i = 0; i < size; i++)
 			ret[k][i] = (ECtarget/ECsource)*modified[k][i];				
-		}
 	}
-
 	return ret;
 }
 
@@ -261,38 +243,45 @@ static void process(char *ims, char *imt, char* imdname){
 
 	pnm imd = pnm_new(cols, rows, PnmRawPpm);
 
+
 	//Etape 1 : RGB -> LMS -> lalphabeta
-	// RGB -> LMS
-	// Conversion en log (attention en 0 -> noir)
-	// LMS -> lalphabeta
-	//conversion 1
+
+	// unsigned short -> float
 	float ** sourcef = convert_to_float(source);
 	float ** targetf = convert_to_float(target);
-	
 
+	// RGB -> LMS
 	float** lmssource = produitMat(sourcef, RGB2LMS, size);
 	float** lmstarget = produitMat(targetf, RGB2LMS, size);
 
+	// Conversion en log (attention en 0 -> noir)
 	logMatrice(lmssource,size);
 	logMatrice(lmstarget,size);
 
+	// LMS -> lalphabeta
 	float** labsource = produitMat(lmssource, LMS2LAB,size);
 	float** labtarget = produitMat(lmstarget, LMS2LAB,size);
 
+
+
 	//Etape 2 : Transfert des stats
+
 	float** modified = matriceMinusMean(labsource, size);
 	float** modified2 = matriceTransfET(labsource, labtarget, modified,size);
 	float** labimd = matricePlusMean(modified2, labtarget, size, sizeTarget);
 
 
-  //Etape 3 : lalphabeta -> LMS -> RGB
-  // lalphabeta -> LMS
-  // Convertion exponentielle
-  // LMS -> RGB
-  // Troncature, gérer les "pixels cramés", ramener pixels entre 0 et 255
-	//convert inverse
+
+ 	 //Etape 3 : lalphabeta -> LMS -> RGB
+	
+        // lalphabeta -> LMS
 	float** lmsimd = produitMat(labimd, LAB2LMS, size);
+
+  	// Convertion exponentielle
 	puissance10(lmsimd,size);
+
+	// LMS -> RGB
+  	// Troncature, gérer les "pixels cramés", ramener pixels entre 0 et 255
 	float** rgbimd = produitMat(lmsimd,LMS2RGB,size);
 	for (int k = 0; k < 3; k++)
 	{
@@ -305,11 +294,14 @@ static void process(char *ims, char *imt, char* imdname){
 			}
 		}
 	}
+
+	// float -> unsigned short
 	imd = convert_to_unsigned_short(rgbimd,rows,cols);
 
-	pnm_save(imd, PnmRawPpm, imdname);
 
+	pnm_save(imd, PnmRawPpm, imdname);
 }
+
 
 void usage (char *s){
   fprintf(stderr, "Usage: %s <ims> <imt> <imd> \n", s);
