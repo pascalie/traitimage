@@ -245,7 +245,7 @@ float* pixelNeighborhood(float* image, int rows, int cols, int abs, int ord, int
 	return tmpLinear;
 }
 
-float** statisticsOfCouleur(float* couleur, float** grid, int rowsCouleur, int colsCouleur){
+float** statisticsOfCouleur(float* couleur, int** grid, int rowsCouleur, int colsCouleur){
 	float** ret = malloc(2*sizeof(float*));
 	//luminance moyenne
 	ret[0] = malloc((GRIDPOINTS)*sizeof(float));
@@ -322,14 +322,14 @@ float** statisticsOfCouleur(float* couleur, float** grid, int rowsCouleur, int c
 	ret[0] => abscisse
 	ret[1] => ordonnees
 */
-float** randomGrid(int rows, int cols){
+int** randomGrid(int rows, int cols){
 	if(rows < (GRIDPOINTS) || cols < (GRIDPOINTS)){
 		exit(EXIT_FAILURE);
 	}
 
-	float** ret = malloc(2*sizeof(float*));
-	ret[0] = malloc((GRIDPOINTS)*sizeof(float));
-	ret[1] = malloc((GRIDPOINTS)*sizeof(float));
+	int** ret = malloc(2*sizeof(int*));
+	ret[0] = malloc((GRIDPOINTS)*sizeof(int));
+	ret[1] = malloc((GRIDPOINTS)*sizeof(int));
 
 	int width = rows / GRIDSIZE;
 	int height = cols / GRIDSIZE;
@@ -348,20 +348,12 @@ float distance(float a, float b, float x, float y){
 	return sqrt((a-x)*(a-x) + (b-y)*(b-y));
 }
 
-float minimum(float a, float b){
-	if(a < b){
-		return a;
-	} else {
-		return b;
-	}
-}
-
 
 
 void testRandGrid(int rows, int cols, char* name){
 	pnm imd = pnm_new(cols, rows, PnmRawPpm);
 
-	float** grid = randomGrid(rows, cols);	
+	int** grid = randomGrid(rows, cols);	
 
 	for(int i=0; i<GRIDPOINTS; i++){
 		for(int k=0; k<3;k++){
@@ -374,14 +366,50 @@ void testRandGrid(int rows, int cols, char* name){
 }
 
 int matchingPixel(float *neighborhood, float** statistics, int* sizeNeighborhood){
-	//TODO
+	float moy = moyenne(neighborhood, *sizeNeighborhood);
+	float ecType = ecartType(neighborhood, *sizeNeighborhood);
+
+	int ret;
+
+	float min = distance(moy, ecType, statistics[0][0], statistics[1][0]);
+	float tmp = min;
+	for(int i=1; i<GRIDPOINTS;i++){
+		tmp = distance(moy, ecType, statistics[0][i], statistics[1][i]);
+		if(tmp <= min){
+			ret = i;
+			min = tmp;
+		}
+	}
+
+	return ret;
+}
+
+void colorize(float** black, float** couleur, float** statistics, int** jitteredGrid, int rowsBlack, int colsBlack, int colsCouleur, int rowsCouleur){
+
+	printf("colsCouleur :%d     rowsCouleur:%d\n", colsCouleur, rowsCouleur);
+
+	for(int i=0; i<colsBlack;i++){
+		for (int j = 0; j < rowsBlack; j++){
+			int* neighborhoodSize = malloc(sizeof(int));
+			float* neighborhood = pixelNeighborhood(black[0], rowsBlack, colsBlack, i, j, neighborhoodSize);
+
+			int matchPixel = matchingPixel(neighborhood, statistics, neighborhoodSize);
+			int absMatching = jitteredGrid[0][matchPixel];
+			int ordMatching = jitteredGrid[1][matchPixel];
+
+			black[1][j*colsBlack+i] = couleur[1][ordMatching*colsCouleur+absMatching];
+			black[2][j*colsBlack+i] = couleur[2][ordMatching*colsCouleur+absMatching];
+
+		}
+	}
+
+
 }
 
 
-
 static void process(char *ims, char *imt, char* imdname){
-	pnm source = pnm_load(imt);
-	pnm target = pnm_load(ims);
+	pnm source = pnm_load(imt);//couleur
+	pnm target = pnm_load(ims);//gris
 
 	int cols = pnm_get_width(source);
 	int rows = pnm_get_height(source);
@@ -415,18 +443,18 @@ static void process(char *ims, char *imt, char* imdname){
 
 
 	//Etape 2 : Luminance remapping
-	luminanceRemapping(labsource[0], labtarget[0], size, sizeTarget);
+	luminanceRemapping(labtarget[0], labsource[0], size, sizeTarget);
 
 
 	//Etape 3 : Génération d'une liste aléatoire de points
-	float** jitteredGrid = randomGrid(rows, cols);
+	int** jitteredGrid = randomGrid(rowsTarget, colsTarget);
 
 	//Etape 4 : Transformation finale
-	float** statistics = statisticsOfCouleur(labsource[0], jitteredGrid, rows, cols);
+	float** statistics = statisticsOfCouleur(labtarget[0], jitteredGrid, rowsTarget, colsTarget);
 
+	colorize(labsource, labtarget, statistics, jitteredGrid, rows, cols,colsTarget,rowsTarget);
 
-
-
+	//(void)statistics;
 
  	 //Etape 1 bis (transformation inverse) : lalphabeta -> LMS -> RGB
 	
@@ -454,24 +482,26 @@ static void process(char *ims, char *imt, char* imdname){
 	// float -> unsigned short
 	imd = convert_to_unsigned_short(rgbimd,rows,cols);
 
+(void)sizeTarget;
+(void)colsTarget;
+(void)rowsTarget;
 
+(void)labtarget;
 	pnm_save(imd, PnmRawPpm, imdname);
 }
 
 
 void usage (char *s){
   fprintf(stderr, "Usage: %s <ims> <imt> <imd> \n", s);
-  testRandGrid(720, 1024, "a.ppm");
-  testRandGrid(720, 1024, "b.ppm");
-  testRandGrid(720, 1024, "c.ppm");
-  testRandGrid(720, 1024, "d.ppm");
-  testRandGrid(720, 1024, "e.ppm");
-
+  testRandGrid(720,1024, "a.ppm");
   exit(EXIT_FAILURE);
 }
 
 #define param 3
 int main(int argc, char *argv[]){
+	printf("GRIDSIZE : %d\n",GRIDSIZE);
+	printf("GRIDPOINTS : %d\n",GRIDPOINTS);
+
 	srand(time(NULL));
 	
 	if (argc != param+1) 
