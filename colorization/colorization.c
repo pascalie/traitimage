@@ -1,10 +1,6 @@
 /**
- * @file color-transfer
- * @brief transfert color from source image to target image.
- *        Method from Reinhard et al. : 
- *        Erik Reinhard, Michael Ashikhmin, Bruce Gooch and Peter Shirley, 
- *        'Color Transfer between Images', IEEE CGA special issue on 
- *        Applied Perception, Vol 21, No 5, pp 34-41, September - October 2001
+ * @file colorization
+ * @brief Transferring Color to Greyscale Images
  * @authors HENRY Pascalie & GRUCHET Sébastien
  */
 
@@ -93,11 +89,6 @@ float** convert_to_float(pnm RGB){
 			ret[2][(i*cols)+j] = (float)B[(i*cols)+j];
 		}
 	}
-	/*
-    free(R);
-    free(G);
-    free(B);
-    */
     return ret;
 }
 
@@ -186,18 +177,12 @@ float ecartType(float* tab, int size){
 	return ecartType;
 } 
 
+// Calcul d'un entier aléatoire entre A et B
 int randAB(int a, int b){
     return rand()%(b-a) +a;
 }
 
-float absolue(float a){
-	if (a<0){
-		return -1*a;
-	} else {
-		return a;
-	}
-}
-
+// Méthode d'adaptation de la luminance
 void luminanceRemapping(float* couleur, float* black, int sizeCouleur, int sizeBlack){
 	float Ecouleur = ecartType(couleur,sizeCouleur);
 	float Eblack = ecartType(black, sizeBlack);
@@ -210,31 +195,26 @@ void luminanceRemapping(float* couleur, float* black, int sizeCouleur, int sizeB
 	}
 }
 
+// Calcul du voisinage d'un pixel
 float* pixelNeighborhood(float* image, int rows, int cols, int abs, int ord, int *retSize){
-	//printf("start pixelNeighborhood\n");
 	int distHG = NEIGHBORHOODHALF;
 	int distHD = NEIGHBORHOODHALF;
 	int distVH = NEIGHBORHOODHALF;
 	int distVB = NEIGHBORHOODHALF;
 	if(abs < NEIGHBORHOODHALF){
-		//printf("checkpoint1\n");
 		distHG = abs;
 	}
 
 	if(abs > cols-NEIGHBORHOODHALF-1){
-		//printf("checkpointNEIGHBORHOODHALF\n");
 		distHD = cols - 1 - abs;
 	}
 
 	if(ord < NEIGHBORHOODHALF){
-		//printf("checkpointNEIGBORHOODHALF-1\n");
 		distVH = ord;
 	}
 
 	if(ord > rows-NEIGHBORHOODHALF-1){
-		//printf("checkpoint4\n");
 		distVB = rows - 1 - ord;
-		//printf("ord : %d   rows : %d   distVB : %d", ord, rows, distVB);
 	}
 
 	int tmpWidth = distHG + distHD +1;
@@ -263,16 +243,15 @@ float* pixelNeighborhood(float* image, int rows, int cols, int abs, int ord, int
 		}
 	}
 
-
 	for (int i = 0; i < tmpWidth; i++){
 		free(tmp[i]);
 	}
 	free(tmp);
-
-	//printf("end pixelNeighborhood\n");
 	return tmpLinear;
 }
 
+
+// Création d'une matrice contenant les moyennes et les écart-types du voisinage d'un pixel
 float** statisticsOfCouleur(float* couleur, int** grid, int rowsCouleur, int colsCouleur){
 	float** ret = malloc(2*sizeof(float*));
 	//luminance moyenne
@@ -280,24 +259,20 @@ float** statisticsOfCouleur(float* couleur, int** grid, int rowsCouleur, int col
 	
 	//luminance ecart type
 	ret[1] = malloc((GRIDPOINTS)*sizeof(float));
-
-
 	for(int k=0; k <GRIDPOINTS; k++){
 		int* tmpLinearSize = malloc(sizeof(int));
 		float *tmpLinear = pixelNeighborhood(couleur, rowsCouleur, colsCouleur, grid[1][k], grid[0][k], tmpLinearSize);
 		ret[0][k] = moyenne(tmpLinear, *tmpLinearSize);
 		ret[1][k] = ecartType(tmpLinear, *tmpLinearSize);
-	
 	}
 	
 	return ret;
 }
 
-
-/*
-	ret[0] => abscisse
-	ret[1] => ordonnees
-*/
+/* Création d'une grille répartisant aléatoirement des points en divisant le rectangle initial 
+selon les constantes GRIDPOINTS et GRIDSIZE, puis un point est choisie aléatoirement dans chaque
+rectangle.
+La fonction retourne un tableau contenant la liste des abscisses et la liste des ordonnées de ces points. */
 int** randomGrid(int rows, int cols){
 	if(rows < (GRIDSIZE) || cols < (GRIDSIZE)){
 		exit(EXIT_FAILURE);
@@ -320,12 +295,14 @@ int** randomGrid(int rows, int cols){
 	return ret;
 }
 
+
+// Calcul de la distance entre la luminance moyenne et l'écart-type des deux matrices 
 float distance(float a, float b, float x, float y){
 	return sqrt((a-x)*(a-x) + (b-y)*(b-y));
 }
 
 
-
+// Fonction testant la génération aléatoire des points, elle n'est pas utilisée par la suite
 void testRandGrid(int rows, int cols, char* name){
 	pnm imd = pnm_new(cols, rows, PnmRawPpm);
 
@@ -341,6 +318,8 @@ void testRandGrid(int rows, int cols, char* name){
 
 }
 
+
+// Fonction qui choisit le pixel le plus semblable à chaque pixel de l'image parmis la liste des points aléatoire 
 int matchingPixel(float *neighborhood, float** statistics, int* sizeNeighborhood){
 	float moy = moyenne(neighborhood, *sizeNeighborhood);
 	float ecType = ecartType(neighborhood, *sizeNeighborhood);
@@ -348,12 +327,10 @@ int matchingPixel(float *neighborhood, float** statistics, int* sizeNeighborhood
 	int ret;
 
 	float min = distance(moy, ecType, statistics[0][0], statistics[1][0]);
-	//float min = absolue((moy+ecType) - (statistics[0][0]+statistics[1][0]));
 	
 	float tmp = min;
 	for(int i=1; i<GRIDPOINTS;i++){
 		tmp = distance(moy, ecType, statistics[0][i], statistics[1][i]);
-		//tmp = absolue((moy+ecType) - (statistics[0][0]+statistics[1][0]));
 		if(tmp <= min){
 			ret = i;
 			min = tmp;
@@ -363,11 +340,8 @@ int matchingPixel(float *neighborhood, float** statistics, int* sizeNeighborhood
 }
 
 
-
-void colorize(float** black, float** couleur, float** statistics, int** jitteredGrid, int rowsBlack, int colsBlack, int colsCouleur, int rowsCouleur){
-
-	printf("colsCouleur :%d     rowsCouleur:%d\n", colsCouleur, rowsCouleur);
-
+// Fonction qui copie les champs alpha et béta des points sélectionnés sur l'image colorée dans l'image en noir et blanc
+void colorize(float** black, float** couleur, float** statistics, int** jitteredGrid, int rowsBlack, int colsBlack, int colsCouleur){
 	for(int i=0; i<colsBlack;i++){
 		for (int j = 0; j < rowsBlack; j++){
 			int* neighborhoodSize = malloc(sizeof(int));
@@ -431,9 +405,7 @@ static void process(char *ims, char *imt, char* imdname){
 	//Etape 4 : Transformation finale
 	float** statistics = statisticsOfCouleur(labtarget[0], jitteredGrid, rowsTarget, colsTarget);
 
-	colorize(labsource, labtarget, statistics, jitteredGrid, rows, cols,colsTarget,rowsTarget);
-
-	//(void)statistics;
+	colorize(labsource, labtarget, statistics, jitteredGrid, rows, cols,colsTarget);
 
  	 //Etape 1 bis (transformation inverse) : lalphabeta -> LMS -> RGB
 	
@@ -463,8 +435,8 @@ static void process(char *ims, char *imt, char* imdname){
 
 	pnm_save(imd, PnmRawPpm, imdname);
 
-	//free
-	//flottant
+	//Libération de la mémoire allouée
+	//flottants
 	for(int i=0; i<3;i++){
 		free(sourcef[i]);
 	}
@@ -520,21 +492,17 @@ static void process(char *ims, char *imt, char* imdname){
 
 void usage (char *s){
   fprintf(stderr, "Usage: %s <ims> <imt> <imd> \n", s);
-  testRandGrid(720,1024, "a.ppm");
   exit(EXIT_FAILURE);
 }
 
 #define param 3
 int main(int argc, char *argv[]){
-	printf("GRIDSIZE : %d\n",GRIDSIZE);
-	printf("GRIDPOINTS : %d\n",GRIDPOINTS);
-	printf("NEIGHBORHOODHALF : %d\n",NEIGHBORHOODHALF);
-	printf("NEIGHBORHOODSIZE : %d\n",NEIGHBORHOODSIZE);
 
 	srand(time(NULL));
 	
 	if (argc != param+1) 
     	usage(argv[0]);
 	process(argv[1], argv[2], argv[3]);
+	printf("Image colorisée.\n");
 	return EXIT_SUCCESS;
 }
