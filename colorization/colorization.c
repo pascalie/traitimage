@@ -93,9 +93,11 @@ float** convert_to_float(pnm RGB){
 			ret[2][(i*cols)+j] = (float)B[(i*cols)+j];
 		}
 	}
+	/*
     free(R);
     free(G);
     free(B);
+    */
     return ret;
 }
 
@@ -260,6 +262,7 @@ float* pixelNeighborhood(float* image, int rows, int cols, int abs, int ord, int
 			tmpLinear[j+tmpWidth+i] = tmp[i][j];
 		}
 	}
+
 
 	for (int i = 0; i < tmpWidth; i++){
 		free(tmp[i]);
