@@ -6,6 +6,7 @@ LDLIBS = -lbcl -lm
 
 OBJ = domain.o
 BIN = colorization\
+		test\
 
 
 all: $(BIN)
