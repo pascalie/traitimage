@@ -1,7 +1,10 @@
 /**
- * @file colorization
- * @brief transfering Color to Greyscale Images
- *       
+ * @file color-transfer
+ * @brief transfert color from source image to target image.
+ *        Method from Reinhard et al. : 
+ *        Erik Reinhard, Michael Ashikhmin, Bruce Gooch and Peter Shirley, 
+ *        'Color Transfer between Images', IEEE CGA special issue on 
+ *        Applied Perception, Vol 21, No 5, pp 34-41, September - October 2001
  * @authors HENRY Pascalie & GRUCHET Sébastien
  */
 
@@ -90,10 +93,10 @@ float** convert_to_float(pnm RGB){
 			ret[2][(i*cols)+j] = (float)B[(i*cols)+j];
 		}
 	}
-	free(R);
-	free(G);
-	free(B);
-    	return ret;
+    free(R);
+    free(G);
+    free(B);
+    return ret;
 }
 
 // Conversion float to unsigned short
@@ -258,8 +261,9 @@ float* pixelNeighborhood(float* image, int rows, int cols, int abs, int ord, int
 		}
 	}
 
-	for(int i = 0; i<tmpWidth; i++)
-	  free(tmp[i]);
+	for (int i = 0; i < tmpWidth; i++){
+		free(tmp[i]);
+	}
 	free(tmp);
 
 	//printf("end pixelNeighborhood\n");
@@ -279,9 +283,8 @@ float** statisticsOfCouleur(float* couleur, int** grid, int rowsCouleur, int col
 		int* tmpLinearSize = malloc(sizeof(int));
 		float *tmpLinear = pixelNeighborhood(couleur, rowsCouleur, colsCouleur, grid[1][k], grid[0][k], tmpLinearSize);
 		ret[0][k] = moyenne(tmpLinear, *tmpLinearSize);
-		ret[1][k] = ecartType(tmpLinear, *tmpLinearSize);		
-		free(tmpLinearSize);
-		//free(tmpLinear);
+		ret[1][k] = ecartType(tmpLinear, *tmpLinearSize);
+	
 	}
 	
 	return ret;
@@ -341,12 +344,13 @@ int matchingPixel(float *neighborhood, float** statistics, int* sizeNeighborhood
 
 	int ret;
 
-	//float min = distance(moy, ecType, statistics[0][0], statistics[1][0]);
-	float min = absolue((moy+ecType) - (statistics[0][0]+statistics[1][0]));
+	float min = distance(moy, ecType, statistics[0][0], statistics[1][0]);
+	//float min = absolue((moy+ecType) - (statistics[0][0]+statistics[1][0]));
+	
 	float tmp = min;
 	for(int i=1; i<GRIDPOINTS;i++){
-		//tmp = distance(moy, ecType, statistics[0][i], statistics[1][i]);
-		tmp = absolue((moy+ecType) - (statistics[0][0]+statistics[1][0]));
+		tmp = distance(moy, ecType, statistics[0][i], statistics[1][i]);
+		//tmp = absolue((moy+ecType) - (statistics[0][0]+statistics[1][0]));
 		if(tmp <= min){
 			ret = i;
 			min = tmp;
@@ -372,8 +376,8 @@ void colorize(float** black, float** couleur, float** statistics, int** jittered
 
 			black[1][j*colsBlack+i] = couleur[1][ordMatching*colsCouleur+absMatching];
 			black[2][j*colsBlack+i] = couleur[2][ordMatching*colsCouleur+absMatching];
-			free(neighborhoodSize);
 
+			free(neighborhoodSize);
 		}
 	}
 }
@@ -452,24 +456,62 @@ static void process(char *ims, char *imt, char* imdname){
 	}
 
 	// float -> unsigned short
-
-
-
 	imd = convert_to_unsigned_short(rgbimd,rows,cols);
 
 	pnm_save(imd, PnmRawPpm, imdname);
 
+	//free
+	//flottant
+	for(int i=0; i<3;i++){
+		free(sourcef[i]);
+	}
 	free(sourcef);
+	for(int i=0; i<3;i++){
+		free(targetf[i]);
+	}
 	free(targetf);
-	free(lmssource);
-	free(lmstarget);
-	free(labsource);
-	free(labtarget);
-	free(jitteredGrid);
-	free(statistics);
-	free(lmsimd);
-	free(rgbimd);
 
+	//lms
+	for(int i=0; i<3;i++){
+		free(lmssource[i]);
+	}
+	free(lmssource);
+	for(int i=0; i<3;i++){
+		free(lmstarget[i]);
+	}
+	free(lmstarget);
+
+	//lab
+	for(int i=0; i<3;i++){
+		free(labsource[i]);
+	}
+	free(labsource);
+	for(int i=0; i<3;i++){
+		free(labtarget[i]);
+	}
+	free(labtarget);
+
+	//jitteredGrid
+	for(int i=0; i<2;i++){
+		free(jitteredGrid[i]);
+	}
+	free(jitteredGrid);
+
+	//statistics
+	for(int i=0; i<2;i++){
+		free(statistics[i]);
+	}
+	free(statistics);
+
+	//imd
+	for(int i=0; i<3;i++){
+		free(lmsimd[i]);
+	}
+	free(lmsimd);
+	for(int i=0; i<3;i++){
+		free(rgbimd[i]);
+	}
+	free(rgbimd);
 }
 
 

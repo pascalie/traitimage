@@ -11,5 +11,7 @@
 ./colorization ../data/sat-c.ppm ../data/sat-g.ppm j.ppm
 ./colorization ../data/sat-c.ppm ../data/sat-g.ppm k.ppm
 
+pvisu *.ppm
+
 
 exit 0
