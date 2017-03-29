@@ -52,19 +52,21 @@ unsigned short *backward(int rows, int cols, fftw_complex* freq_repr){
 
 void freq2spectra(int rows, int cols, fftw_complex* freq_repr, float* as, float* ps) 
 {
-  (void)rows;
-  (void)cols;
-  (void)freq_repr;
-  (void)as;
-  (void)ps;
+
+  for (int i = 0; i < rows*cols; ++i)
+  {
+    as[i] = sqrt(creal(freq_repr[i])*creal(freq_repr[i]) + cimag(freq_repr[i])*cimag(freq_repr[i]));
+    ps[i] = atan2f(cimag(freq_repr[i]),creal(freq_repr[i]));
+  }
+
 }
 
 
 void spectra2freq(int rows, int cols, float* as, float* ps, fftw_complex* freq_repr)
 {
-  (void)rows;
-  (void)cols;
-  (void)freq_repr;
-  (void)as;
-  (void)ps;
+
+  for (int i = 0; i < rows*cols; ++i)
+  {
+    freq_repr[i] = as[i]*cosf(ps[i]) + I*as[i]*sinf(ps[i]);
+  }
 }
