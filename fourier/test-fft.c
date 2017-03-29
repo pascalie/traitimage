@@ -125,9 +125,6 @@ test_for_backward(pnm ims, char* name)
 static void
 test_reconstruction(pnm ims, char* name)
 { 
-  (void)ims;
-  (void)name;
-  /*
   fprintf(stderr, "test_reconstruction: ");
   int rows = pnm_get_height(ims);
   int cols = pnm_get_width(ims);
@@ -189,7 +186,6 @@ test_reconstruction(pnm ims, char* name)
   free(ps);
   free(freq_rep);
   fprintf(stderr, "OK\n");
-  */
 }
 
 
