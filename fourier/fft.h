@@ -11,7 +11,6 @@
 #include <fftw3.h>
 #include <bcl.h>
 
-unsigned short convert_to_unsigned_short(float a);
 /**
  * @brief perform a discrete 2D Fourier transform from grayscale image
  * @param int rows: the input image height

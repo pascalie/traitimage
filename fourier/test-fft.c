@@ -12,109 +12,89 @@
 
 #include "fft.h"
 
-/**
- * @brief test the forward and backward functions
- * @param pnm ims, the source image
- * @param char* name, the image file name
- */
+//Renvoie la valeur maximale d'un tableau de float
+float maxValue(float *as, int rows, int cols)
+{
+  float max = 0;
 
+  for (int i = 0; i < rows; ++i)
+  {
+    for (int j = 0; j < cols; ++j)
+    {
+      for (int k = 0; k < 3; ++k)
+      {
+        if(*as > max)
+          max = *as;
 
-
-int mystrlen(char* a){
-  int ret = 0;
-
-  for(int i=0; a[i] != '\0'; i++){
-    ret++;
+        as++;
+      }
+    }
   }
-  ret++;
-
-  return ret;
-
+  as -= cols*rows*3;
+  return max;
 }
 
-char * mystrcat(char* first, char* second){
-  int sFirst = strlen(first);
-  int sSecond = strlen(second);
 
-  char* ret = malloc(sFirst+sSecond-1);
-
-  for(int i=0; i< sFirst; i++){
-    ret[i] = first[i];
-  }
-
-  for(int i=0; i<sSecond;i++){
-    ret[i+sFirst] = second[i];
-  }
-
-  return ret;
-}
 int find_last_slash(char* a){
   int ret=0;
   for(int i=0; a[i] != '\0'; i++){
     if(a[i] == '/')
       ret = i;
   }
-
   ret++;
   return ret;
 }
 
-static void
-test_for_backward(pnm ims, char* name)
-{
-  fprintf(stderr, "test_for_backward: ");
+/**
+ * @brief test the forward and backward functions
+ * @param pnm ims, the source image
+ * @param char* name, the image file name
+ */
+ static void test_for_backward(pnm ims, char* name){
 
-  int rows = pnm_get_height(ims);
-  int cols = pnm_get_width(ims);
+   fprintf(stderr, "test_for_backward: ");
+   int cols = pnm_get_width(ims);
+   int rows = pnm_get_height(ims);
 
-  unsigned short *start = pnm_get_image(ims);
-  unsigned short *current = pnm_get_image(ims);
-  unsigned short* canal = malloc(sizeof(unsigned short)*cols*rows); // TO FREE
-  for(int i=0;i<rows; i++){
+   pnm imd = pnm_new(cols, rows, PnmRawPpm);
+
+   unsigned short *ps = pnm_get_image(ims);
+   unsigned short *pd = pnm_get_image(imd);
+
+   fftw_complex *fftw_for;
+   
+   //Transformation de fourrier
+   fftw_for = forward(rows, cols, ps);
+   //Transformation inverse
+   unsigned short *out = backward(rows, cols, fftw_for);
+
+   for(int i=0;i<rows;i++){
     for(int j=0;j<cols;j++){
-      current = start + pnm_offset(ims, i,j);
-      canal[(i*cols)+j] = *current;
+      for(int c=0; c<3; c++){
+        *pd = *out;
+        pd++;
+        out++;
+      }
     }
   }
-
-  fftw_complex *complex_img = forward(rows,cols,canal);
-  unsigned short *values = backward(rows,cols,complex_img);
-
-
-  pnm ret = pnm_new(cols, rows, PnmRawPpm);
-  for (int i = 0; i < rows; ++i)
-    for (int j = 0; j < cols; ++j)
-      for (int k = 0; k < 3; ++k)
-        pnm_set_component(ret,i,j,k,values[i*cols+j]);  
-
-
-  char tmpName[strlen(name) - find_last_slash(name)];
+  pd -= 3*cols*rows;
+  out -= 3*cols*rows;
+ 
+  //Gestion des noms
+  char tmp_name[strlen(name) - find_last_slash(name)];
   for(int i = find_last_slash(name); name[i] != '\0';i++){
-    tmpName[i-find_last_slash(name)] = name[i];
+    tmp_name[i-find_last_slash(name)] = name[i];
   }
 
-  char prefix[] = "FB-";
-
-  printf("tmpName : %s\n",tmpName);
-
-  printf("prefix : %s\n", prefix);
-
-  char* newName = mystrcat(prefix,tmpName);
-
-  
-
-  printf("newName : %s\n", newName);
-
-  pnm_save(ret,PnmRawPpm,newName);
-  
-  free(newName);
-  free(canal);
-  free(complex_img);
-  free(values);
+  char dest_name [30];
+  strcpy(dest_name,"FB-");
+  strcat(dest_name,tmp_name);
+  pnm_save(imd, PnmRawPpm, dest_name);
+  fftw_free(fftw_for);
+  pnm_free(imd);
+  free(out);
   fprintf(stderr, "OK\n");
 }
-
-
 
 
 /**
@@ -122,158 +102,126 @@ test_for_backward(pnm ims, char* name)
  * @param pnm ims: the source image
  * @param char *name: the image file name
  */
-static void
-test_reconstruction(pnm ims, char* name)
-{ 
+ static void test_reconstruction(pnm ims, char* name)
+ {
   fprintf(stderr, "test_reconstruction: ");
-  int rows = pnm_get_height(ims);
   int cols = pnm_get_width(ims);
+  int rows = pnm_get_height(ims);
+  pnm imd = pnm_new(cols, rows, PnmRawPpm);
 
-  unsigned short *start = pnm_get_image(ims);
-  unsigned short *current = pnm_get_image(ims);
-  unsigned short* canal = malloc(sizeof(unsigned short)*cols*rows); // TO FREE
-  for(int i=0;i<rows; i++){
+  unsigned short *ps = pnm_get_image(ims);
+  unsigned short *pd = pnm_get_image(imd);
+  fftw_complex* fftw_for;
+  //Transformation de Fourrier
+  fftw_for = forward(rows, cols, ps);
+
+
+  float* freq_as = malloc(rows*cols*3*sizeof(float));
+  float* freq_ps = malloc(rows*cols*3*sizeof(float));
+
+  //Génération des spectres
+  freq2spectra(rows,cols,fftw_for,freq_as,freq_ps);
+
+  fftw_complex* freq_repr = (fftw_complex*) fftw_malloc(rows*cols*sizeof(fftw_complex));
+  
+  //Génération de l'image à partir des spectres
+  spectra2freq(rows,cols,freq_as,freq_ps,freq_repr);
+
+  //transformation de Fourrier inverse
+  unsigned short *out = backward(rows, cols, freq_repr);
+  for(int i=0;i<rows;i++){
     for(int j=0;j<cols;j++){
-      current = start + pnm_offset(ims, i,j);
-      canal[(i*cols)+j] = *current;
+      for(int c=0; c<3; c++){
+        *pd = *out;
+        pd++;
+        out++;
+      }
     }
   }
-
-  //toComplex
-  fftw_complex *complex_img = forward(rows,cols,canal);
-
-      //toSpectre
-  float * as = malloc(rows*cols*sizeof(float));
-  float * ps = malloc(rows*cols*sizeof(float));
-  freq2spectra(rows,cols,complex_img,as,ps);
-
-
-  fftw_complex * freq_rep = malloc(rows*cols*sizeof(fftw_complex)); 
-  
-      //end toSpectre
-  spectra2freq(rows,cols,as,ps,freq_rep);
-  
-  //end toComplex
-  unsigned short *values = backward(rows,cols,freq_rep);
-
-
-  pnm ret = pnm_new(cols, rows, PnmRawPpm);
-  for (int i = 0; i < rows; ++i)
-    for (int j = 0; j < cols; ++j)
-      for (int k = 0; k < 3; ++k){
-        pnm_set_component(ret,i,j,k,values[i*cols+j]);
-        //printf("ret : %u\n",pnm_get_component(ret,i,j,k));  
-      }
-
-
-  char tmpName[strlen(name) - find_last_slash(name)];
+    
+  //Gestion des noms
+  char tmp_name[strlen(name) - find_last_slash(name)];
   for(int i = find_last_slash(name); name[i] != '\0';i++){
-    tmpName[i-find_last_slash(name)] = name[i];
+    tmp_name[i-find_last_slash(name)] = name[i];
   }
 
-  char prefix[] = "FB-ASPS-";
-
-  char* newName = mystrcat(prefix,tmpName);
-
-
-  pnm_save(ret,PnmRawPpm,newName);
-  
-  free(newName);
-  free(canal);
-  free(complex_img);
-  free(values);
-  free(as);
-  free(ps);
-  free(freq_rep);
+  char dest_name [30];
+  strcpy(dest_name,"FB-ASPS-");
+  strcat(dest_name,tmp_name);
+  pnm_save(imd, PnmRawPpm, dest_name);
+  fftw_free(freq_repr);
+  fftw_free(fftw_for);
+  free(freq_as);
+  free(freq_ps);
   fprintf(stderr, "OK\n");
 }
-
 
 /**
  * @brief test construction of amplitude and phase images in ppm files
  * @param pnm ims, the source image
  * @param char* name, the image file name
  */
-static void
-test_display(pnm ims, char* name)
-{
+ static void test_display(pnm ims, char* name)
+ {
   fprintf(stderr, "test_display: ");
-
-  (void)ims;
-  (void)name;
- /*
-  int rows = pnm_get_height(ims);
   int cols = pnm_get_width(ims);
+  int rows = pnm_get_height(ims);
+  unsigned short *ps = pnm_get_image(ims);
+  fftw_complex* fftw_for;
 
-  unsigned short *start = pnm_get_image(ims);
-  unsigned short *current = pnm_get_image(ims);
-  unsigned short* canal = malloc(sizeof(unsigned short)*cols*rows); // TO FREE
-  for(int i=0;i<rows; i++){
-    for(int j=0;j<cols;j++){
-      current = start + pnm_offset(ims, i,j);
-      canal[(i*cols)+j] = *current;
+  //Transformation de Fourrier
+  fftw_for = forward(rows, cols, ps);
+
+  float* freq_as = malloc(rows*cols*3*sizeof(float));
+  float* freq_ps = malloc(rows*cols*3*sizeof(float));
+
+  //Génération des Spectres
+  freq2spectra(rows,cols,fftw_for,freq_as,freq_ps);
+
+  pnm im_as = pnm_new(cols, rows, PnmRawPpm);
+  pnm im_ps = pnm_new(cols, rows, PnmRawPpm);
+
+  float asmax = maxValue(freq_as, rows, cols);
+
+  //Transformation non linéaire
+  for (int i = 0; i < rows; ++i)
+  {
+    for (int j = 0; j < cols; ++j)
+    {
+      for (int k = 0; k < 3; ++k)
+      {
+        pnm_set_component(im_as, i, j, k,(short) (255*pow(*freq_as/asmax, 0.15)));
+        pnm_set_component(im_ps, i, j, k, (short) *freq_ps);
+        freq_as++;
+        freq_ps++;
+      }
     }
   }
 
-  //toComplex
-  fftw_complex *complex_img = forward(rows,cols,canal);
-
-      //toSpectre
-  float * as = malloc(rows*cols*sizeof(float));
-  float * ps = malloc(rows*cols*sizeof(float));
-  freq2spectra(rows,cols,complex_img,as,ps);
-
-  fftw_complex * freq_rep = malloc(rows*cols*sizeof(fftw_complex)); 
-  unsigned short * asu = malloc(rows*cols*sizeof(unsigned short));
-  unsigned short * psu = malloc(rows*cols*sizeof(unsigned short));
-  for (int i = 0; i < rows*cols; ++i)   
-  {
-    as[i] = logf(1 + as[i]);
-    asu[i] = convert_to_unsigned_short(as[i]);
-    psu[i] = convert_to_unsigned_short(ps[i]);
-  }
-
-  
-
-  pnm ret1 = pnm_new(cols, rows, PnmRawPpm);
-  for (int i = 0; i < rows; ++i)
-    for (int j = 0; j < cols; ++j)
-      for (int k = 0; k < 3; ++k)
-        pnm_set_component(ret1,i,j,k,as[i*cols+j]);  
-
-  pnm ret2 = pnm_new(cols, rows, PnmRawPpm);
-  for (int i = 0; i < rows; ++i)
-    for (int j = 0; j < cols; ++j)
-      for (int k = 0; k < 3; ++k)
-        pnm_set_component(ret2,i,j,k,ps[i*cols+j]); 
-
-
-
-  char tmpName[strlen(name) - find_last_slash(name)];
+  //Gestion des noms
+  char tmp_name[strlen(name) - find_last_slash(name)];
   for(int i = find_last_slash(name); name[i] != '\0';i++){
-    tmpName[i-find_last_slash(name)] = name[i];
+    tmp_name[i-find_last_slash(name)] = name[i];
   }
 
-  char prefix1[] = "AS-";
-  char prefix2[] = "PS-";
-
-  char* newName1 = mystrcat(prefix1,tmpName);
-  char* newName2 = mystrcat(prefix2,tmpName);
-
-  pnm_save(ret1,PnmRawPpm,newName1);
-  pnm_save(ret2,PnmRawPpm,newName2);
+  char dest_name [30];
+  strcpy(dest_name,"AS-");
+  strcat(dest_name,tmp_name);
+  pnm_save(im_as, PnmRawPpm, dest_name);
   
-  free(newName1);
-  free(newName2);
-  free(canal);
-  free(complex_img);
-  free(as);
-  free(ps);
-  free(freq_rep);
-
-  */
+  char tmp_name2[strlen(name) - find_last_slash(name)];
+  for(int i = find_last_slash(name); name[i] != '\0';i++){
+    tmp_name2[i-find_last_slash(name)] = name[i];
+  }
+  char dest_name2 [30];
+  strcpy(dest_name2,"PS-");
+  strcat(dest_name2,tmp_name2);
+  pnm_save(im_ps, PnmRawPpm, dest_name2);
+  pnm_free(im_ps);
+  pnm_free(im_as);
   fprintf(stderr, "OK\n");
 }
+
 
 /**
  * @brief test the modification of amplitude spectrum and 
@@ -281,12 +229,96 @@ test_display(pnm ims, char* name)
  * @param pnm ims, the source image
  * @param char* name, the image file name
  */
-static void
-test_add_frequencies(pnm ims, char* name)
-{
+ static void test_add_frequencies(pnm ims, char* name)
+ {
   fprintf(stderr, "test_add_frequencies: ");
-  (void)ims;
-  (void)name;
+  int cols = pnm_get_width(ims);
+  int rows = pnm_get_height(ims);
+  pnm imd = pnm_new(cols, rows, PnmRawPpm);
+  unsigned short *ps = pnm_get_image(ims);
+  unsigned short *pd = pnm_get_image(imd);
+  fftw_complex* fftw_for;
+  
+  //Transformation de Fourrier
+  fftw_for = forward(rows, cols, ps);
+
+  float* freq_as = malloc(rows*cols*3*sizeof(float));
+  float* freq_ps = malloc(rows*cols*3*sizeof(float));
+
+  //Génération des Spectres
+  freq2spectra(rows,cols,fftw_for,freq_as,freq_ps);
+
+  float asmax = maxValue(freq_as, rows, cols);
+
+  pnm im_as = pnm_new(cols, rows, PnmRawPpm);
+
+  int mi = rows/2;
+  int mj = cols/2;
+
+  //Modification du spectre
+  float new_val = 0.25*asmax;
+  for(int k = 0 ; k<3 ; k++){
+    //fonction horizontale
+    freq_as[cols*mi*3+mj*3 - 8*3 +k] = new_val;
+    freq_as[cols*mi*3+mj*3 + 8*3 +k] = new_val;
+    //fonction verticale
+    freq_as[cols*(mi-8)*3 + mj*3 +k] = new_val;
+    freq_as[cols*(mi+8)*3 + mj*3 +k] = new_val;
+
+  }
+
+  //Transformation non linéaire
+  asmax = maxValue(freq_as, rows, cols);
+
+  for (int i = 0; i < rows; ++i)
+  {
+    for (int j = 0; j < cols; ++j)
+    {
+      for (int k = 0; k < 3; ++k)
+      {
+        pnm_set_component(im_as, i, j, k,(short) (255*pow(*freq_as/asmax, 0.15)));
+        freq_as++;
+      }
+    }
+  }
+  freq_as -= 3*rows*cols;
+  //Génération de l'image à partir des spectres
+  fftw_complex* freq_repr = (fftw_complex*) fftw_malloc(rows*cols*sizeof(fftw_complex));
+  spectra2freq(rows,cols,freq_as,freq_ps,freq_repr);
+
+  unsigned short *out = backward(rows, cols, freq_repr);
+  for(int i=0;i<rows;i++){
+    for(int j=0;j<cols;j++){
+      for(int c=0; c<3; c++){
+        *pd = *out;
+        pd++;
+        out++;
+      }
+    }
+  }
+
+  //Gestion des noms
+  char tmp_name[strlen(name) - find_last_slash(name)];
+  for(int i = find_last_slash(name); name[i] != '\0';i++){
+    tmp_name[i-find_last_slash(name)] = name[i];
+  }
+
+  char dest_name [30];
+  strcpy(dest_name,"FAS-");
+  strcat(dest_name,tmp_name);
+  pnm_save(im_as, PnmRawPpm, dest_name);
+  
+  char tmp_name2[strlen(name) - find_last_slash(name)];
+  for(int i = find_last_slash(name); name[i] != '\0';i++){
+    tmp_name2[i-find_last_slash(name)] = name[i];
+  }
+  char dest_name2 [30];
+  strcpy(dest_name2,"FREQ-");
+  strcat(dest_name2,tmp_name2);
+  pnm_save(imd, PnmRawPpm, dest_name2);
+  pnm_free(im_as);
+  pnm_free(imd);
+
   fprintf(stderr, "OK\n");
 }
 
