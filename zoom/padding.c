@@ -19,7 +19,7 @@ void run(int factor,pnm ims,char * name){
 	int new_cols = cols*factor;
 	pnm imd = pnm_new(new_cols,new_rows,PnmRawPpm);
 	
-   	/*unsigned short *ps = pnm_get_image(ims);
+   	unsigned short *ps = pnm_get_image(ims);
    	unsigned short *pd = pnm_get_image(imd);
 
    	
@@ -27,10 +27,17 @@ void run(int factor,pnm ims,char * name){
    
    	//Transformation de fourrier
    	fftw_for = forward(rows, cols, ps);
-    
+
+  
+
    	//Centrer l'image dans l'autre
     fftw_complex* fftw_big = (fftw_complex*) fftw_malloc(new_rows*new_cols*sizeof(fftw_complex));
-    */
+
+    for (int i = 0; i < new_cols*new_rows; ++i)
+    {
+    	fftw_big[i] = 0*I + 0;
+    }
+    /*
 
     for (int i = 0; i < cols; ++i)
     {
@@ -45,10 +52,21 @@ void run(int factor,pnm ims,char * name){
     	}
     }
 
-    /*
+    */
+
+     for (int i = 0; i < cols; ++i)
+    {
+    	for (int j = 0; j < rows; ++j)
+    	{
+    	
+  				fftw_big[(((new_cols)/2 - (int)(cols/2) + i )*cols)+((new_rows)/2 - (int)(rows/2) + j)] = fftw_for[(i*cols)+j];
+    			//printf("%f\n",creal(fftw_big[i*new_cols+j]) );
+    		//fftw_big[(i*cols)+j] = fftw_for[(i*cols)+j];
+    	}
+    }
 
    	//Transformation inverse
-   	unsigned short *out = backward(new_rows, new_cols, fftw_big);
+   	unsigned short *out = backward(new_rows, new_cols, fftw_big, factor);
 
     for(int i=0;i<new_rows;i++){
       for(int j=0;j<new_cols;j++){
@@ -62,12 +80,11 @@ void run(int factor,pnm ims,char * name){
    pd -= 3*new_cols*new_rows;
    out -= 3*new_cols*new_rows;
  
-   */
    pnm_save(imd, PnmRawPpm, name);
-   //fftw_free(fftw_for);
-   //fftw_free(fftw_big);
+   fftw_free(fftw_for);
+   fftw_free(fftw_big);
    pnm_free(imd);
-   //free(out);
+   free(out);
    fprintf(stderr, "OK\n");
 
 

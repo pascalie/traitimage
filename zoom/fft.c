@@ -40,7 +40,7 @@ fftw_complex *forward(int rows, int cols, unsigned short* image)
 
 
 unsigned short 
-*backward(int rows, int cols, fftw_complex* freq_repr)
+*backward(int rows, int cols, fftw_complex* freq_repr, int factor)
 {
   //Transformation de fourrier inverse
   unsigned short * img_out = malloc(rows*cols*sizeof(unsigned short)*3);
@@ -59,9 +59,10 @@ unsigned short
   {
     for (int j = 0; j < cols; ++j)
     {
-      (*fftw_back)*=(1./(rows*cols));
+      (*fftw_back)*=((float)factor*factor/(rows*cols));
       for (int k = 0; k < 3; ++k)
       {
+        printf("%f\n", creal(*fftw_back));
         if ((i+j) % 2 == 0){
           tmp = creal(*fftw_back);
         }

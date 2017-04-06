@@ -29,7 +29,7 @@ extern fftw_complex
  * @return the grayscale image from inverse Fourier transform
  */
 extern unsigned short 
-*backward(int rows, int cols, fftw_complex *freq_repr);
+*backward(int rows, int cols, fftw_complex *freq_repr, int factor);
 
 /**
  * @brief compute amplitude and phase spectrum from frequency domain
