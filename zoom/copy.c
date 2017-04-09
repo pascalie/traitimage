@@ -19,6 +19,8 @@ void run(int factor,pnm ims,char * name){
 	int new_rows = rows*factor;
 	int new_cols = cols*factor;
 	pnm imd = pnm_new(new_cols,new_rows,PnmRawPpm);
+	
+	//Remplissage de la nouvelle image
 	for (int i = 0; i < cols; ++i)
 	{
 		for (int j = 0; j < rows; ++j)
